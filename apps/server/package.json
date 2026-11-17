@@ -1,16 +1,32 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Restaurant management backend API",
+  "main": "dist/index.js",
   "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint src/**/*.ts",
+    "typecheck": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["restaurant", "api", "backend"],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
-    "express": "^5.3.0"
+    "express": "^5.3.0",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.17.6",
+    "typescript": "^5.7.2",
+    "tsx": "^4.19.2",
+    "eslint": "^9.15.0",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0"
   }
 }
