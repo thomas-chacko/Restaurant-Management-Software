@@ -4,11 +4,9 @@ Restaurant management software for one restaurant. Waiters take orders, the kitc
 
 ## Stack
 
-- Monorepo: pnpm workspaces + Turborepo (to be set up)
-- `apps/server`: Node.js + Express + TypeScript, Drizzle ORM, Zod, Socket.IO
-- `apps/client`: Next.js (App Router) + TypeScript + Tailwind, admin/manager/kitchen/delivery screens
-- `apps/waiter-pwa`: Vite + React + TypeScript PWA for waiters, vite-plugin-pwa
-- `packages/shared`: order state machine, roles and permission map, Zod schemas, shared types (to be created)
+- `apps/server/`: Node.js + Express + TypeScript, Drizzle ORM, Zod, Socket.IO
+- `apps/client/`: Next.js (App Router) + TypeScript + Tailwind, admin/manager/kitchen/delivery screens
+- `apps/waiter-pwa/`: Vite + React + TypeScript PWA for waiters, vite-plugin-pwa
 - Database: PostgreSQL (Neon in production, Docker locally)
 - Redis: used later for queues and the Socket.IO adapter, not required in early phases
 - Images: Cloudinary, with signed uploads only
@@ -16,38 +14,44 @@ Restaurant management software for one restaurant. Waiters take orders, the kitc
 ## Current structure
 
 ```
-apps/
-├── server/      (empty - backend API)
-├── client/      (empty - web frontend)
-└── waiter-pwa/  (empty - waiter PWA)
-docs/
-├── architecture.md
-└── business-rules.md
+Restaurant-Management-Software/
+├── apps/
+│   ├── server/      (backend API)
+│   ├── client/      (web frontend)
+│   └── waiter-pwa/  (waiter PWA)
+├── docs/
+│   ├── Architecture.md
+│   └── business-rules.md
+├── package.json     (root scripts)
+├── .gitignore
+├── README.md
+└── AGENTS.md
 ```
-
-No `packages/` directory yet. No monorepo config yet.
 
 ## Folder rules
 
 - `apps/server/src/routes`: HTTP endpoints only. Keep them thin.
 - `apps/server/src/services`: business logic (billing, discounts, rider assignment, stock).
-- `apps/server/src/db`: Drizzle schema and queries. Only the server touches the database.
-- `apps/server/src/realtime`: Socket.IO setup and room rules.
-- `packages/shared`: anything used by more than one app. Keep it free of server-only code.
-- Do not import from `apps/*` into `packages/*`.
+- `apps/server/src/models`: Drizzle schema and queries. Only the server touches the database.
+- `apps/server/src/socket`: Socket.IO setup and room rules.
+- Shared code: Copy types and utilities between apps as needed. Keep them in sync manually or use a script.
 
-## Commands (once monorepo is set up)
+## Commands
 
-- Install: `pnpm install`
-- Dev: `pnpm dev`
-- Test: `pnpm test`
-- Type-check: `pnpm typecheck`
-- Lint: `pnpm lint`
-- Build: `pnpm build`
+Run from root directory:
+
+- Install: `npm run install:all` (installs all apps)
+- Dev: `npm run dev` (starts all apps)
+- Build: `npm run build` (builds all apps)
+- Lint: `npm run lint` (lints all apps)
+- Test: `npm run test` (tests all apps)
+
+Or run individual apps:
+- `npm run dev:server` - Start backend only
+- `npm run dev:client` - Start web app only
+- `npm run dev:pwa` - Start waiter PWA only
 
 Run typecheck, lint, and tests before saying a task is done. Report any failures honestly.
-
-**Note:** These commands are not yet configured. Set up the monorepo and workspace scripts first.
 
 ## Non-negotiable rules
 
@@ -58,7 +62,7 @@ Run typecheck, lint, and tests before saying a task is done. Report any failures
 ### Security and roles
 - Every API route checks authentication and role on the server. Frontend checks are for UX only.
 - Scope data by role. A delivery user may only read orders assigned to them. Add a test for this.
-- Use the permission map in `packages/shared/roles.ts`. Do not scatter `if (role === ...)` checks.
+- Define a permission map for roles. Do not scatter `if (role === ...)` checks throughout the code.
 - Never trust prices, totals, or permissions sent by the client. Recalculate on the server.
 - Validate every request body, query, and param with Zod.
 - Use parameterized queries via Drizzle. Never build SQL from user input.
@@ -66,7 +70,7 @@ Run typecheck, lint, and tests before saying a task is done. Report any failures
 - Never log passwords, tokens, card data, or customer phone numbers and addresses.
 
 ### Orders and state
-- Order status changes go only through `packages/shared/order-state.ts`.
+- Order status changes must follow a state machine. Invalid transitions are rejected.
 - The API enforces transitions. The UI must not be the only check.
 - Use the `version` column for optimistic locking on orders.
 - Emit Socket.IO events only after the database transaction commits.
@@ -109,11 +113,11 @@ Run typecheck, lint, and tests before saying a task is done. Report any failures
 
 ## Where to look
 
-- Business rules and order flow: `docs/business-rules.md` (empty, to be written)
-- Architecture: `docs/architecture.md` (empty, to be written)
-- Order state machine: `packages/shared/order-state.ts` (does not exist yet)
-- Roles and permissions: `packages/shared/roles.ts` (does not exist yet)
-- Decisions and reasons: `docs/decisions/` (does not exist yet)
+- Business rules and order flow: `docs/business-rules.md`
+- Architecture and system design: `docs/Architecture.md`
+- API documentation: `docs/api.md` (to be created)
+
+**Note:** When implementing order state machine and role permissions, create utility modules in `apps/server/src/utils/` for reusability.
 
 ## Open questions (ask before deciding)
 

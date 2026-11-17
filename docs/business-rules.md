@@ -394,9 +394,9 @@ Items that need clarification before implementation:
 
 ## References
 
-- Order state machine: `packages/shared/order-state.ts` (to be created)
-- Role permission map: `packages/shared/roles.ts` (to be created)
-- Architecture decisions: `docs/decisions/` (to be created)
+- Order state machine: Implement in server utilities (see Order States section above)
+- Role permission map: See Permission Map table above
+- Architecture: `docs/Architecture.md`
 
 ---
 

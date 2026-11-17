@@ -115,13 +115,7 @@ A full-stack restaurant management system for a single restaurant, supporting mu
 
 ## Technology Stack
 
-### Monorepo
-
-- **pnpm workspaces**: Package manager and workspace management
-- **Turborepo**: Build orchestration, caching, and task running
-- **TypeScript**: Type safety across the entire stack
-
-### Backend (`apps/server`)
+### Backend (`apps/server/`)
 
 | Technology | Purpose | Version |
 |------------|---------|---------|
@@ -136,7 +130,7 @@ A full-stack restaurant management system for a single restaurant, supporting mu
 | PostgreSQL | Database | 15+ |
 | Redis | Caching & queues (future) | 7.x |
 
-### Frontend - Web (`apps/client`)
+### Frontend - Web (`apps/client/`)
 
 | Technology | Purpose | Version |
 |------------|---------|---------|
@@ -149,7 +143,7 @@ A full-stack restaurant management system for a single restaurant, supporting mu
 | Socket.IO client | Real-time updates | 4.x |
 | Zustand | Client state management | 4.x |
 
-### Frontend - Waiter PWA (`apps/waiter-pwa`)
+### Frontend - Waiter PWA (`apps/waiter-pwa/`)
 
 | Technology | Purpose | Version |
 |------------|---------|---------|
@@ -161,13 +155,6 @@ A full-stack restaurant management system for a single restaurant, supporting mu
 | React Query | Data fetching | 5.x |
 | Socket.IO client | Real-time updates | 4.x |
 
-### Shared (`packages/shared`)
-
-- TypeScript types
-- Zod schemas
-- Business logic (order state machine, roles)
-- Utilities (money conversion, date formatting)
-
 ---
 
 ## Project Structure
@@ -178,13 +165,17 @@ Restaurant-Management-Software/
 │   ├── server/              # Backend API
 │   ├── client/              # Web frontend
 │   └── waiter-pwa/          # Waiter PWA
-├── packages/
-│   └── shared/              # Shared code
 ├── docs/                    # Documentation
-├── pnpm-workspace.yaml      # Workspace config
-├── turbo.json               # Turborepo config
-└── package.json             # Root package.json
+├── package.json             # Root scripts
+├── .gitignore
+├── README.md
+└── AGENTS.md
 ```
+
+**Shared Code:**
+- Types and utilities are copied between apps as needed
+- Keep them synchronized manually or use a script
+- Server types can be copied to client/waiter-pwa
 
 See [business-rules.md](./business-rules.md) for detailed folder rules.
 
@@ -279,7 +270,7 @@ Uses **Drizzle ORM**:
 - Transaction support
 
 ```typescript
-// apps/server/src/db/schema.ts
+// apps/server/src/models/schema.ts
 export const orders = pgTable('orders', {
   id: uuid('id').primaryKey().defaultRandom(),
   orderNumber: serial('order_number'),
@@ -764,9 +755,11 @@ POST /api/v1/orders
 
 ## State Management
 
-### Order State Machine
+### State Management
 
-Defined in `packages/shared/order-state.ts`:
+Order state machine must be implemented on the server and enforced by the API.
+
+**Allowed transitions are defined in the business rules document.**
 
 ```typescript
 export const orderStateMachine = {
@@ -982,67 +975,47 @@ Content-Security-Policy:
 
 ---
 
-## Development Workflow
+### Development Workflow
 
-### Branch Strategy
+### Install Dependencies
 
-```
-main            # Production-ready code
-├── develop     # Integration branch
-└── feature/*   # Feature branches
-```
-
-### CI/CD Pipeline
-
-```yaml
-# .github/workflows/ci.yml
-on: [push, pull_request]
-
-jobs:
-  test:
-    - Install dependencies (pnpm install)
-    - Type check (pnpm typecheck)
-    - Lint (pnpm lint)
-    - Test (pnpm test)
-    - Build (pnpm build)
-  
-  deploy:
-    - On push to main → Deploy to production
-    - On push to develop → Deploy to staging
+```bash
+# Install all apps at once
+npm run install:all
 ```
 
 ### Local Development
 
 ```bash
 # Start all apps
-pnpm dev
+npm run dev
 
 # Or individual apps
-pnpm dev --filter=server
-pnpm dev --filter=client
-pnpm dev --filter=waiter-pwa
+npm run dev:server
+npm run dev:client
+npm run dev:pwa
 
 # Run tests
-pnpm test
-
-# Type check
-pnpm typecheck
+npm run test
 
 # Lint
-pnpm lint
+npm run lint
+
+# Build
+npm run build
 ```
 
 ### Database Migrations
 
 ```bash
 # Generate migration
-pnpm --filter=server db:generate
+cd apps/server && npm run db:generate
 
 # Apply migration
-pnpm --filter=server db:migrate
+cd apps/server && npm run db:migrate
 
 # Seed database (development)
-pnpm --filter=server db:seed
+cd apps/server && npm run db:seed
 ```
 
 ---
@@ -1090,9 +1063,7 @@ pnpm --filter=server db:seed
 ## References
 
 - [Business Rules](./business-rules.md) - Business logic and workflows
-- [API Documentation](./api.md) - Detailed API reference (to be created)
-- [Deployment Guide](./deployment.md) - Deployment instructions (to be created)
-- [Decisions](./decisions/) - Architecture Decision Records (to be created)
+- [AGENTS.md](../AGENTS.md) - AI assistant rules for this project
 
 ---
 
