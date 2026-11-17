@@ -1,0 +1,34 @@
+{
+  "name": "restaurant-management-software",
+  "version": "1.0.0",
+  "description": "Restaurant management system with order tracking, billing, and delivery management",
+  "private": true,
+  "scripts": {
+    "install:all": "cd server && npm install && cd ../client && npm install && cd ../waiter-pwa && npm install",
+    "dev": "npm run dev:server & npm run dev:client & npm run dev:pwa",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "dev:pwa": "cd waiter-pwa && npm run dev",
+    "build": "npm run build:server && npm run build:client && npm run build:pwa",
+    "build:server": "cd server && npm run build",
+    "build:client": "cd client && npm run build",
+    "build:pwa": "cd waiter-pwa && npm run build",
+    "lint": "npm run lint:server && npm run lint:client && npm run lint:pwa",
+    "lint:server": "cd server && npm run lint",
+    "lint:client": "cd client && npm run lint",
+    "lint:pwa": "cd waiter-pwa && npm run lint",
+    "test": "npm run test:server && npm run test:client",
+    "test:server": "cd server && npm run test",
+    "test:client": "cd client && npm run test",
+    "clean": "rm -rf server/node_modules server/dist client/.next client/node_modules waiter-pwa/dist waiter-pwa/node_modules"
+  },
+  "keywords": [
+    "restaurant",
+    "management",
+    "pos",
+    "order-tracking",
+    "delivery"
+  ],
+  "author": "",
+  "license": "ISC"
+}
