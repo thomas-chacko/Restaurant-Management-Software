@@ -53,6 +53,51 @@ Or run individual apps:
 
 Run typecheck, lint, and tests before saying a task is done. Report any failures honestly.
 
+## UI/UX Requirements
+
+### Responsive Design
+- **Mobile-first approach**: All pages must work perfectly on mobile (320px+), tablet, and desktop
+- **Sidebar navigation**: Must have a toggle button on mobile (hamburger menu)
+- **Touch-friendly**: Buttons and interactive elements minimum 44px tap target
+- **Breakpoints**: Follow standard Tailwind breakpoints (sm: 640px, md: 768px, lg: 1024px, xl: 1280px)
+- **Test on mobile**: Always check mobile view when building UI components
+
+### Design Principles
+- **Clean and minimalist**: No unnecessary elements, clear visual hierarchy
+- **Modern look**: Rounded corners, subtle shadows, smooth transitions
+- **Consistent spacing**: Use Tailwind spacing scale (4px, 8px, 12px, 16px, 24px, 32px)
+- **Readable typography**: Clear font sizes, adequate line height, proper contrast
+- **Fast and responsive**: Optimize images, use skeleton loaders, minimize layout shifts
+
+### Focus and Interactive States
+- **No focus rings**: Clean design with just border color change on focus
+- **Input focus**: Border color darkens slightly (`border-zinc-400`) on focus, no ring
+- **Hover states**: Subtle color changes on hover (e.g., `hover:bg-zinc-100`, `hover:border-zinc-300`)
+- **Cursor pointer**: ALWAYS add `cursor-pointer` to ALL interactive elements:
+  - Buttons (even if they already have it implicitly)
+  - Links
+  - Clickable divs
+  - Menu items
+  - Cards that are clickable
+  - Icons with onClick handlers
+- **Disabled state**: Reduce opacity and use `cursor-not-allowed`
+- **Transitions**: Smooth transitions for all interactive states (200ms)
+
+Example interactive styles:
+```css
+/* Clean focus - no ring, just border */
+input:focus {
+  border-color: #a1a1aa; /* zinc-400 */
+  outline: none;
+}
+
+/* Always include cursor-pointer explicitly */
+button, a, [role="button"], [onClick] {
+  cursor: pointer;
+  transition: all 200ms;
+}
+```
+
 ## Non-negotiable rules
 
 ### Money
@@ -102,6 +147,7 @@ Run typecheck, lint, and tests before saying a task is done. Report any failures
 - Do not run `git push`, deploy commands, or destructive commands such as `rm -rf` without explicit approval.
 - Do not delete or rewrite tests to make them pass. Fix the code instead, or explain why the test is wrong.
 - Write tests first for money, discounts, roles, and delivery cash logic.
+- **Do NOT create markdown (.md) files without explicit permission from the user.**
 
 ## Definition of done
 
