@@ -15,9 +15,9 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
 
-    // Mock login - just redirect to manager dashboard
+    // Mock login - just redirect to dashboard
     setTimeout(() => {
-      router.push("/manager/dashboard");
+      router.push("/dashboard");
     }, 1000);
   };
 

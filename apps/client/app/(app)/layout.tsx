@@ -7,45 +7,72 @@ import { AIChat } from "@/components/ai/AIChat";
 import { usePathname } from "next/navigation";
 
 const pageTitles: Record<string, { title: string; description?: string }> = {
-  "/manager/dashboard": {
+  "/dashboard": {
     title: "Dashboard",
     description: "Welcome back, here's what's happening today",
   },
-  "/manager/orders": {
+  "/orders": {
     title: "Orders",
     description: "Manage and track all orders",
   },
-  "/manager/billing": {
+  "/billing": {
     title: "Billing",
     description: "Process payments and close bills",
   },
-  "/manager/delivery": {
+  "/delivery": {
     title: "Delivery",
     description: "Manage deliveries and riders",
   },
-  "/manager/menu": {
+  "/tables": {
+    title: "Tables",
+    description: "Manage restaurant tables",
+  },
+  "/menu": {
     title: "Menu",
     description: "Manage menu items and categories",
   },
-  "/manager/reports": {
+  "/inventory": {
+    title: "Inventory",
+    description: "Track stock and inventory",
+  },
+  "/customers": {
+    title: "Customers",
+    description: "Manage customer database",
+  },
+  "/staff": {
+    title: "Staff",
+    description: "Manage staff and roles",
+  },
+  "/reports": {
     title: "Reports",
     description: "View sales and performance reports",
   },
+  "/settings": {
+    title: "Settings",
+    description: "Configure system settings",
+  },
+  "/kitchen": {
+    title: "Kitchen Queue",
+    description: "Manage kitchen orders",
+  },
 };
 
-export default function ManagerLayout({
+export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const pageInfo = pageTitles[pathname] || { title: "Manager Portal" };
+  const pageInfo = pageTitles[pathname] || { title: "Restaurant Management" };
+
+  // TODO: Get actual user role from authentication
+  const userRole = "manager"; // Hardcoded for now
 
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-50">
       <Sidebar 
-        role="manager" 
+        role={userRole as any}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
@@ -60,7 +87,6 @@ export default function ManagerLayout({
           {children}
         </main>
       </div>
-      
       <AIChat />
     </div>
   );

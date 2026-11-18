@@ -38,7 +38,7 @@ export default function NotFound() {
             <ArrowLeft className="h-4 w-4" />
             Go Back
           </Button>
-          <Link href="/manager/dashboard">
+          <Link href="/dashboard">
             <Button className="w-full gap-2 sm:w-auto">
               <Home className="h-4 w-4" />
               Go to Dashboard

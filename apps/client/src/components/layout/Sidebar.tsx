@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -14,6 +14,12 @@ import {
   LogOut,
   X,
   ChefHat,
+  Package,
+  Grid3x3,
+  UserCircle,
+  Settings,
+  Receipt,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,26 +29,124 @@ interface SidebarProps {
   onClose: () => void;
 }
 
-const managerLinks = [
-  { href: "/manager/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/manager/orders", label: "Orders", icon: ShoppingBag },
-  { href: "/kitchen", label: "Kitchen Queue", icon: ChefHat },
-  { href: "/manager/billing", label: "Billing", icon: CreditCard },
-  { href: "/manager/delivery", label: "Delivery", icon: Truck },
-  { href: "/manager/menu", label: "Menu", icon: UtensilsCrossed },
-  { href: "/manager/reports", label: "Reports", icon: FileText },
-];
+interface MenuItem {
+  href: string;
+  label: string;
+  icon: any;
+  roles: ("admin" | "manager" | "kitchen" | "delivery")[]; // Which roles can see this menu
+}
 
-const adminLinks = [
-  { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/staff", label: "Staff", icon: Users },
-  { href: "/admin/menu", label: "Menu", icon: UtensilsCrossed },
-  { href: "/admin/reports", label: "Reports", icon: FileText },
+// Single unified menu - filter by role when rendering
+const allMenuItems: MenuItem[] = [
+  { 
+    href: "/dashboard", 
+    label: "Dashboard", 
+    icon: LayoutDashboard,
+    roles: ["admin", "manager", "kitchen", "delivery"]
+  },
+  { 
+    href: "/orders", 
+    label: "Orders", 
+    icon: ShoppingBag,
+    roles: ["admin", "manager"]
+  },
+  { 
+    href: "/kitchen", 
+    label: "Kitchen Queue", 
+    icon: ChefHat,
+    roles: ["admin", "manager", "kitchen"]
+  },
+  { 
+    href: "/billing", 
+    label: "Billing", 
+    icon: CreditCard,
+    roles: ["admin", "manager"]
+  },
+  { 
+    href: "/delivery", 
+    label: "Delivery", 
+    icon: Truck,
+    roles: ["admin", "manager", "delivery"]
+  },
+  { 
+    href: "/tables", 
+    label: "Tables", 
+    icon: Grid3x3,
+    roles: ["admin", "manager"]
+  },
+  { 
+    href: "/menu", 
+    label: "Menu", 
+    icon: UtensilsCrossed,
+    roles: ["admin", "manager"]
+  },
+  { 
+    href: "/inventory", 
+    label: "Inventory", 
+    icon: Package,
+    roles: ["admin", "manager"]
+  },
+  { 
+    href: "/customers", 
+    label: "Customers", 
+    icon: UserCircle,
+    roles: ["admin", "manager"]
+  },
+  { 
+    href: "/staff", 
+    label: "Staff", 
+    icon: Users,
+    roles: ["admin", "manager"]
+  },
+  { 
+    href: "/categories", 
+    label: "Categories", 
+    icon: Grid3x3,
+    roles: ["admin"]
+  },
+  { 
+    href: "/tax-billing", 
+    label: "Tax & Billing", 
+    icon: Receipt,
+    roles: ["admin"]
+  },
+  { 
+    href: "/users", 
+    label: "Users & Roles", 
+    icon: Shield,
+    roles: ["admin"]
+  },
+  { 
+    href: "/audit-logs", 
+    label: "Audit Logs", 
+    icon: FileText,
+    roles: ["admin"]
+  },
+  { 
+    href: "/reports", 
+    label: "Reports", 
+    icon: FileText,
+    roles: ["admin", "manager"]
+  },
+  { 
+    href: "/settings", 
+    label: "Settings", 
+    icon: Settings,
+    roles: ["admin", "manager"]
+  },
 ];
 
 export function Sidebar({ role, isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const links = role === "admin" ? adminLinks : managerLinks;
+  const router = useRouter();
+  
+  // Filter menu items based on user role
+  const links = allMenuItems.filter(item => item.roles.includes(role));
+
+  const handleLogout = () => {
+    // TODO: Clear authentication session
+    router.push("/login");
+  };
 
   return (
     <>
@@ -75,7 +179,7 @@ export function Sidebar({ role, isOpen, onClose }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 overflow-y-auto space-y-1 p-4">
         {links.map((link) => {
           const Icon = link.icon;
           const isActive = pathname === link.href;
@@ -102,7 +206,7 @@ export function Sidebar({ role, isOpen, onClose }: SidebarProps) {
       {/* User section */}
       <div className="border-t border-zinc-200 p-4">
         <button
-          onClick={() => onClose()}
+          onClick={handleLogout}
           className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
         >
           <LogOut className="h-5 w-5" />
