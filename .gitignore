@@ -70,6 +70,7 @@ Desktop.ini
 
 # TypeScript
 *.tsbuildinfo
+next-env.d.ts
 
 # PWA
 **/sw.js

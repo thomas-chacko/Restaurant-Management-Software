@@ -148,6 +148,7 @@ button, a, [role="button"], [onClick] {
 - Do not delete or rewrite tests to make them pass. Fix the code instead, or explain why the test is wrong.
 - Write tests first for money, discounts, roles, and delivery cash logic.
 - **Do NOT create markdown (.md) files without explicit permission from the user.**
+- **Do NOT edit auto-generated files**: `next-env.d.ts` is managed by Next.js and will be overwritten on every dev/build.
 
 ## Definition of done
 

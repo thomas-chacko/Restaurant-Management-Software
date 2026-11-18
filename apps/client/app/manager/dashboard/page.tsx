@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingBag, DollarSign, Clock, TrendingUp } from "lucide-react";
@@ -7,6 +8,11 @@ import { mockOrders } from "@/data/mockData";
 import { formatCurrency, formatTime } from "@/lib/utils";
 
 export default function ManagerDashboard() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   // Calculate stats from mock data
   const activeOrders = mockOrders.filter(
     (o) => !["completed", "cancelled", "voided"].includes(o.status)
@@ -119,7 +125,7 @@ export default function ManagerDashboard() {
                       </Badge>
                     </div>
                     <p className="text-sm text-zinc-500">
-                      {order.items.length} items • {formatTime(order.createdAt)}
+                      {order.items.length} items • {mounted ? formatTime(order.createdAt) : '--:--'}
                     </p>
                   </div>
                 </div>

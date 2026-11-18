@@ -16,17 +16,22 @@ interface Message {
 export function AIChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content: "Hi! I'm your AI assistant. Ask me about sales, inventory, orders, or trends. For example: 'How is business today?' or 'What are the top selling items?'",
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Initialize welcome message in useEffect to avoid Date during render
+  useEffect(() => {
+    if (messages.length === 0) {
+      setMessages([{
+        id: "1",
+        role: "assistant",
+        content: "Hi! I'm your AI assistant. Ask me about sales, inventory, orders, or trends. For example: 'How is business today?' or 'What are the top selling items?'",
+        timestamp: new Date(),
+      }]);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
