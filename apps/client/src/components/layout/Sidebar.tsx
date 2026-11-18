@@ -207,7 +207,7 @@ export function Sidebar({ role, isOpen, onClose }: SidebarProps) {
       <div className="border-t border-zinc-200 p-4">
         <button
           onClick={handleLogout}
-          className="flex w-full cursor-pointer items-center justify-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
+          className="flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-100"
         >
           <LogOut className="h-5 w-5" />
           Logout

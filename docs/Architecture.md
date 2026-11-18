@@ -1,1070 +1,736 @@
-# Architecture
+# Restaurant Management System - Architecture
 
-This document describes the technical architecture, design decisions, and system structure of the restaurant management software.
-
----
-
-## Table of Contents
-
-1. [System Overview](#system-overview)
-2. [Architecture Diagram](#architecture-diagram)
-3. [Technology Stack](#technology-stack)
-4. [Project Structure](#project-structure)
-5. [Backend Architecture](#backend-architecture)
-6. [Frontend Architecture](#frontend-architecture)
-7. [Database Design](#database-design)
-8. [Real-time Communication](#real-time-communication)
-9. [Authentication & Authorization](#authentication--authorization)
-10. [API Design](#api-design)
-11. [State Management](#state-management)
-12. [File Upload & Storage](#file-upload--storage)
-13. [Deployment Architecture](#deployment-architecture)
-14. [Security Considerations](#security-considerations)
-15. [Performance & Scalability](#performance--scalability)
-16. [Development Workflow](#development-workflow)
+Complete system architecture and database design for a single-restaurant management system.
 
 ---
 
 ## System Overview
 
-A full-stack restaurant management system for a single restaurant, supporting multiple user roles and real-time order tracking.
+Full-stack restaurant management with multi-role access (Admin, Manager, Waiter, Kitchen, Delivery), real-time order tracking, billing, delivery management, inventory, and reporting.
 
-### Key Features
-
-- **Multi-role access**: Admin, Manager, Waiter, Kitchen, Delivery
-- **Order management**: Dine-in and delivery workflows
-- **Real-time updates**: Live kitchen queue, order status changes
-- **Billing & payments**: Multiple payment methods, discounts, refunds
-- **Delivery tracking**: Rider assignment, cash collection, handover
-- **Inventory management**: Stock movements, low-stock alerts
-- **Reporting**: Sales, staff performance, inventory reports
-- **Audit logging**: Track sensitive actions for compliance
-
-### Design Principles
-
-1. **Separation of concerns**: Business logic in services, not routes
-2. **Single source of truth**: Database is authoritative, frontend is view
-3. **Security by default**: Server validates everything, never trust client
-4. **Real-time first**: Socket.IO for instant updates across devices
-5. **Type safety**: TypeScript everywhere, shared types between frontend/backend
-6. **Optimistic locking**: Version column prevents race conditions
-7. **Audit everything**: Log money-sensitive and permission-sensitive actions
-
----
-
-## Architecture Diagram
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client Layer                            │
-├──────────────────┬──────────────────┬──────────────────────────┤
-│  Web App         │  Waiter PWA      │  Future: Mobile App      │
-│  (Next.js)       │  (Vite + React)  │                          │
-│  - Admin         │  - Order taking  │                          │
-│  - Manager       │  - Table mgmt    │                          │
-│  - Kitchen       │  - Offline ready │                          │
-│  - Delivery      │                  │                          │
-└────────┬─────────┴────────┬─────────┴──────────────────────────┘
-         │                  │
-         │ HTTPS + WS       │ HTTPS + WS
-         │                  │
-┌────────▼──────────────────▼────────────────────────────────────┐
-│                      API Gateway / Load Balancer               │
-└────────┬───────────────────────────────────────────────────────┘
-         │
-┌────────▼───────────────────────────────────────────────────────┐
-│                     Backend (Node.js + Express)                │
-├────────────────────────────────────────────────────────────────┤
-│  Routes          │  Middleware       │  Services               │
-│  - /auth         │  - Authentication │  - OrderService         │
-│  - /orders       │  - Authorization  │  - BillingService       │
-│  - /menu         │  - Validation     │  - DeliveryService      │
-│  - /delivery     │  - Error handler  │  - StockService         │
-│  - /staff        │  - Logger         │  - AuditService         │
-│  - /reports      │                   │                         │
-├────────────────────────────────────────────────────────────────┤
-│  Real-time (Socket.IO)                                         │
-│  - Rooms: kitchen, manager, delivery:{id}, table:{id}          │
-│  - Events: order:created, order:updated, stock:low             │
-└────────┬───────────────────────────────┬───────────────────────┘
-         │                               │
-         │ PostgreSQL                    │ Redis (future)
-         │                               │ - Socket.IO adapter
-┌────────▼───────────────────┐          │ - Job queues
-│     Database (Neon)        │          │ - Rate limiting
-│  - Users, Roles            │          │
-│  - Orders, Order Items     │    ┌─────▼──────┐
-│  - Menu, Categories        │    │   Redis    │
-│  - Tables                  │    │  (Future)  │
-│  - Delivery assignments    │    └────────────┘
-│  - Stock movements         │
-│  - Audit logs              │
-│  - Cash handovers          │
-└────────────────────────────┘
-         │
-         │ (Future: Read replicas)
-         │
-┌────────▼───────────────────┐
-│    Cloudinary              │
-│  - Menu item images        │
-│  - Signed uploads only     │
-└────────────────────────────┘
-```
+**Core Principles:**
+- Server validates everything (never trust client)
+- Money stored as integer paise (no float precision errors)
+- Real-time updates via Socket.IO
+- Type-safe with TypeScript throughout
+- Audit trail for money-sensitive actions
 
 ---
 
 ## Technology Stack
 
-### Backend (`apps/server/`)
+### Backend (`apps/server`)
+- **Runtime**: Node.js 20+ LTS
+- **Framework**: Express 4.x
+- **Language**: TypeScript 5.x
+- **Database ORM**: Drizzle ORM
+- **Validation**: Zod 3.x
+- **Real-time**: Socket.IO 4.x
+- **Authentication**: JWT + argon2id
+- **Database**: PostgreSQL 15+ (Neon in production)
+- **Cache/Queue**: Redis 7.x (future)
 
-| Technology | Purpose | Version |
-|------------|---------|---------|
-| Node.js | Runtime | 20+ LTS |
-| Express | HTTP framework | 4.x |
-| TypeScript | Language | 5.x |
-| Drizzle ORM | Database ORM | Latest |
-| Zod | Schema validation | 3.x |
-| Socket.IO | Real-time communication | 4.x |
-| argon2 | Password hashing | Latest |
-| jsonwebtoken | JWT auth | 9.x |
-| PostgreSQL | Database | 15+ |
-| Redis | Caching & queues (future) | 7.x |
+### Frontend Web (`apps/client`)
+- **Framework**: Next.js 15+ (App Router)
+- **UI Library**: React 19+
+- **Language**: TypeScript 5.x
+- **Styling**: Tailwind CSS 4.x
+- **Data Fetching**: React Query (TanStack Query)
+- **Real-time**: Socket.IO client
+- **State**: Zustand
 
-### Frontend - Web (`apps/client/`)
-
-| Technology | Purpose | Version |
-|------------|---------|---------|
-| Next.js | React framework (App Router) | 14+ |
-| React | UI library | 18+ |
-| TypeScript | Language | 5.x |
-| Tailwind CSS | Styling | 3.x |
-| Shadcn/ui | UI components | Latest |
-| React Query | Data fetching & caching | 5.x |
-| Socket.IO client | Real-time updates | 4.x |
-| Zustand | Client state management | 4.x |
-
-### Frontend - Waiter PWA (`apps/waiter-pwa/`)
-
-| Technology | Purpose | Version |
-|------------|---------|---------|
-| Vite | Build tool | 5.x |
-| React | UI library | 18+ |
-| TypeScript | Language | 5.x |
-| Tailwind CSS | Styling | 3.x |
-| vite-plugin-pwa | PWA support | Latest |
-| React Query | Data fetching | 5.x |
-| Socket.IO client | Real-time updates | 4.x |
-
----
-
-## Project Structure
-
-```
-Restaurant-Management-Software/
-├── apps/
-│   ├── server/              # Backend API
-│   ├── client/              # Web frontend
-│   └── waiter-pwa/          # Waiter PWA
-├── docs/                    # Documentation
-├── package.json             # Root scripts
-├── .gitignore
-├── README.md
-└── AGENTS.md
-```
-
-**Shared Code:**
-- Types and utilities are copied between apps as needed
-- Keep them synchronized manually or use a script
-- Server types can be copied to client/waiter-pwa
-
-See [business-rules.md](./business-rules.md) for detailed folder rules.
-
----
-
-## Backend Architecture
-
-### Layered Architecture
-
-```
-┌─────────────────────────────────────┐
-│          Routes Layer               │  HTTP endpoints, thin controllers
-│  - Request validation (Zod)        │
-│  - Auth/permission checks           │
-│  - Delegate to services             │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│         Services Layer              │  Business logic
-│  - OrderService                     │
-│  - BillingService                   │
-│  - DeliveryService                  │
-│  - StockService                     │
-│  - AuditService                     │
-└──────────────┬──────────────────────┘
-               │
-┌──────────────▼──────────────────────┐
-│       Data Access Layer             │  Database queries
-│  - Drizzle ORM queries              │
-│  - Transaction management           │
-│  - Schema definitions               │
-└─────────────────────────────────────┘
-```
-
-### Route Structure
-
-Routes are **thin controllers** that:
-1. Validate request (Zod schema)
-2. Check authentication and permissions
-3. Call service method
-4. Return response
-
-```typescript
-// apps/server/src/routes/orders.routes.ts
-router.post('/orders', 
-  authenticate,
-  authorize(['waiter', 'manager']),
-  validate(createOrderSchema),
-  async (req, res) => {
-    const order = await OrderService.create(req.body, req.user);
-    res.json(order);
-  }
-);
-```
-
-### Service Layer
-
-Services contain **all business logic**:
-- Validation beyond schema (e.g., stock availability)
-- State transitions (via order state machine)
-- Complex calculations (billing, discounts, tax)
-- Cross-entity operations
-- Emit Socket.IO events
-
-```typescript
-// apps/server/src/services/order.service.ts
-class OrderService {
-  async create(data: CreateOrderDto, user: User): Promise<Order> {
-    // 1. Validate business rules
-    // 2. Calculate prices from menu
-    // 3. Insert into database
-    // 4. Emit Socket.IO event
-    // 5. Return order
-  }
-  
-  async updateStatus(orderId: string, newStatus: OrderStatus, user: User) {
-    // 1. Check permission
-    // 2. Validate state transition
-    // 3. Update with optimistic locking
-    // 4. Emit event
-    // 5. If completed, deduct stock
-  }
-}
-```
-
-### Database Layer
-
-Uses **Drizzle ORM**:
-- Type-safe queries
-- Automatic migrations
-- Parameterized queries (SQL injection safe)
-- Transaction support
-
-```typescript
-// apps/server/src/models/schema.ts
-export const orders = pgTable('orders', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  orderNumber: serial('order_number'),
-  type: varchar('type', { enum: ['dine-in', 'delivery'] }),
-  status: varchar('status', { enum: orderStatuses }),
-  subtotal: integer('subtotal').notNull(),
-  discount: integer('discount').default(0),
-  tax: integer('tax').notNull(),
-  total: integer('total').notNull(),
-  version: integer('version').default(1),
-  createdBy: uuid('created_by').references(() => users.id),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-});
-```
-
----
-
-## Frontend Architecture
-
-### Next.js App Router Structure
-
-```
-apps/client/src/app/
-├── (auth)/
-│   ├── login/
-│   └── layout.tsx
-├── admin/
-│   ├── dashboard/
-│   ├── staff/
-│   ├── menu/
-│   └── reports/
-├── manager/
-│   ├── orders/
-│   ├── delivery/
-│   └── billing/
-├── kitchen/
-│   └── queue/
-├── delivery/
-│   └── orders/
-└── layout.tsx
-```
-
-### Data Fetching Strategy
-
-- **Server components**: Initial data load (fast first paint)
-- **React Query**: Client-side fetching, caching, optimistic updates
-- **Socket.IO**: Real-time updates (invalidate React Query cache)
-
-```typescript
-// Server Component (initial load)
-async function OrdersPage() {
-  const orders = await fetchOrders(); // Server-side fetch
-  return <OrderList initialData={orders} />;
-}
-
-// Client Component (real-time updates)
-'use client';
-function OrderList({ initialData }) {
-  const { data } = useQuery({
-    queryKey: ['orders'],
-    queryFn: fetchOrders,
-    initialData,
-  });
-  
-  useSocket('order:updated', () => {
-    queryClient.invalidateQueries(['orders']);
-  });
-  
-  return <div>{/* render orders */}</div>;
-}
-```
-
-### State Management
-
-- **React Query**: Server state (orders, menu, users)
-- **Zustand**: Client state (UI state, filters, modals)
-- **React Context**: Auth context (current user, permissions)
-
-```typescript
-// Zustand store
-const useUIStore = create((set) => ({
-  sidebarOpen: true,
-  toggleSidebar: () => set((state) => ({ 
-    sidebarOpen: !state.sidebarOpen 
-  })),
-}));
-```
-
-### Component Structure
-
-```
-components/
-├── ui/                  # Shadcn/ui primitives
-│   ├── button.tsx
-│   ├── card.tsx
-│   └── dialog.tsx
-├── orders/              # Feature components
-│   ├── OrderCard.tsx
-│   ├── OrderList.tsx
-│   └── OrderStatusBadge.tsx
-├── layout/              # Layout components
-│   ├── Sidebar.tsx
-│   ├── Header.tsx
-│   └── NavMenu.tsx
-└── shared/              # Shared components
-    ├── DataTable.tsx
-    └── ConfirmDialog.tsx
-```
+### Frontend PWA (`apps/waiter-pwa`)
+- **Build Tool**: Vite 5.x
+- **UI Library**: React 19+
+- **PWA**: vite-plugin-pwa
+- **Offline Support**: Service Worker
+- **Others**: Same as web app
 
 ---
 
 ## Database Design
 
-### Core Tables
+### Schema Overview
 
-#### Users & Auth
-```sql
-users (
-  id UUID PRIMARY KEY,
-  email VARCHAR UNIQUE NOT NULL,
-  password_hash VARCHAR NOT NULL,
-  name VARCHAR NOT NULL,
-  role VARCHAR NOT NULL, -- admin, manager, waiter, kitchen, delivery
-  phone VARCHAR,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
-)
-
-sessions (
-  id UUID PRIMARY KEY,
-  user_id UUID REFERENCES users(id),
-  token VARCHAR NOT NULL,
-  expires_at TIMESTAMP,
-  created_at TIMESTAMP
-)
 ```
-
-#### Orders
-```sql
-orders (
-  id UUID PRIMARY KEY,
-  order_number SERIAL,
-  type VARCHAR NOT NULL, -- dine-in, delivery
-  status VARCHAR NOT NULL, -- pending, cooking, ready, served, completed, etc.
-  table_id UUID REFERENCES tables(id),
-  customer_name VARCHAR,
-  customer_phone VARCHAR,
-  customer_address TEXT,
-  subtotal INTEGER NOT NULL, -- in paise
-  discount INTEGER DEFAULT 0,
-  discount_reason TEXT,
-  tax INTEGER NOT NULL,
-  total INTEGER NOT NULL,
-  payment_method VARCHAR, -- cash, card, upi, online
-  payment_status VARCHAR,
-  notes TEXT,
-  version INTEGER DEFAULT 1, -- optimistic locking
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP,
-  completed_at TIMESTAMP
-)
-
-order_items (
-  id UUID PRIMARY KEY,
-  order_id UUID REFERENCES orders(id) ON DELETE CASCADE,
-  menu_item_id UUID REFERENCES menu_items(id),
-  quantity INTEGER NOT NULL,
-  unit_price INTEGER NOT NULL, -- price at time of order
-  total_price INTEGER NOT NULL,
-  notes TEXT,
-  created_at TIMESTAMP
-)
-```
-
-#### Menu
-```sql
-categories (
-  id UUID PRIMARY KEY,
-  name VARCHAR NOT NULL,
-  display_order INTEGER,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP
-)
-
-menu_items (
-  id UUID PRIMARY KEY,
-  category_id UUID REFERENCES categories(id),
-  name VARCHAR NOT NULL,
-  description TEXT,
-  price INTEGER NOT NULL, -- in paise
-  image_url VARCHAR,
-  is_available BOOLEAN DEFAULT true,
-  min_stock_level INTEGER,
-  created_at TIMESTAMP,
-  updated_at TIMESTAMP
-)
-```
-
-#### Delivery
-```sql
-delivery_assignments (
-  id UUID PRIMARY KEY,
-  order_id UUID REFERENCES orders(id),
-  delivery_user_id UUID REFERENCES users(id),
-  assigned_by UUID REFERENCES users(id),
-  assigned_at TIMESTAMP,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP
-)
-
-cash_handovers (
-  id UUID PRIMARY KEY,
-  delivery_user_id UUID REFERENCES users(id),
-  manager_id UUID REFERENCES users(id),
-  amount INTEGER NOT NULL, -- in paise
-  orders JSONB, -- array of order IDs
-  verified BOOLEAN DEFAULT false,
-  notes TEXT,
-  created_at TIMESTAMP
-)
-```
-
-#### Inventory
-```sql
-stock_movements (
-  id UUID PRIMARY KEY,
-  menu_item_id UUID REFERENCES menu_items(id),
-  type VARCHAR NOT NULL, -- purchase, consumption, waste, adjustment
-  quantity INTEGER NOT NULL, -- positive = add, negative = remove
-  reason TEXT,
-  reference_id UUID, -- order_id if consumption
-  created_by UUID REFERENCES users(id),
-  created_at TIMESTAMP
-)
-```
-
-#### Audit
-```sql
-audit_logs (
-  id UUID PRIMARY KEY,
-  user_id UUID REFERENCES users(id),
-  action VARCHAR NOT NULL, -- discount_applied, order_voided, staff_created, etc.
-  resource_type VARCHAR, -- order, user, stock, etc.
-  resource_id UUID,
-  metadata JSONB, -- action-specific data
-  ip_address VARCHAR,
-  created_at TIMESTAMP
-)
-```
-
-#### Tables
-```sql
-tables (
-  id UUID PRIMARY KEY,
-  table_number VARCHAR UNIQUE NOT NULL,
-  capacity INTEGER,
-  status VARCHAR DEFAULT 'available', -- available, occupied, reserved
-  created_at TIMESTAMP
-)
-```
-
-### Indexes
-
-```sql
--- Performance indexes
-CREATE INDEX idx_orders_status ON orders(status);
-CREATE INDEX idx_orders_created_at ON orders(created_at DESC);
-CREATE INDEX idx_orders_created_by ON orders(created_by);
-CREATE INDEX idx_order_items_order_id ON order_items(order_id);
-CREATE INDEX idx_delivery_assignments_user ON delivery_assignments(delivery_user_id, is_active);
-CREATE INDEX idx_stock_movements_item ON stock_movements(menu_item_id);
-CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
+users ─────┐
+           │
+           ├──▶ orders ◀────── tables
+           │      │
+           │      ├──▶ order_items ──▶ menu_items ◀── categories
+           │      │
+           │      └──▶ delivery_assignments
+           │             │
+           │             └──▶ cash_handovers
+           │
+           ├──▶ stock_movements ──▶ menu_items
+           │
+           └──▶ audit_logs
 ```
 
 ---
 
-## Real-time Communication
+### Core Tables
+
+#### **1. users**
+User accounts for all roles.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Unique user ID |
+| email | varchar(255) | UNIQUE, NOT NULL | Login email |
+| password_hash | varchar(255) | NOT NULL | Argon2id hash |
+| name | varchar(255) | NOT NULL | Full name |
+| role | varchar(20) | NOT NULL | admin, manager, waiter, kitchen, delivery |
+| phone | varchar(20) | | Contact number |
+| is_active | boolean | DEFAULT true | Account enabled |
+| created_at | timestamp | DEFAULT now() | |
+| updated_at | timestamp | DEFAULT now() | |
+
+**Indexes:**
+```sql
+CREATE UNIQUE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_role ON users(role) WHERE is_active = true;
+```
+
+**Why:** Store all staff accounts. `is_active` allows soft delete. Email is unique for login.
+
+---
+
+#### **2. sessions**
+Active user sessions (optional - can use stateless JWT only).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Session ID |
+| user_id | uuid | FK users(id) | User reference |
+| token | varchar(500) | NOT NULL | JWT or session token |
+| expires_at | timestamp | NOT NULL | Session expiry |
+| created_at | timestamp | DEFAULT now() | |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_sessions_user ON sessions(user_id);
+CREATE INDEX idx_sessions_expires ON sessions(expires_at);
+```
+
+**Why:** Track active sessions, enable logout from all devices.
+
+---
+
+#### **3. tables**
+Restaurant tables for dine-in orders.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Table ID |
+| table_number | varchar(20) | UNIQUE, NOT NULL | Display name (T-01, T-02) |
+| capacity | integer | NOT NULL | Max guests |
+| status | varchar(20) | DEFAULT 'available' | available, occupied, reserved |
+| created_at | timestamp | DEFAULT now() | |
+| updated_at | timestamp | DEFAULT now() | |
+
+**Indexes:**
+```sql
+CREATE UNIQUE INDEX idx_tables_number ON tables(table_number);
+CREATE INDEX idx_tables_status ON tables(status);
+```
+
+**Why:** Track table availability for dine-in. Status updated when order created/completed.
+
+---
+
+#### **4. categories**
+Menu categories (Starters, Main Course, Desserts, etc.)
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Category ID |
+| name | varchar(100) | UNIQUE, NOT NULL | Category name |
+| display_order | integer | DEFAULT 0 | Sort order in menu |
+| is_active | boolean | DEFAULT true | Show in menu |
+| created_at | timestamp | DEFAULT now() | |
+| updated_at | timestamp | DEFAULT now() | |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_categories_active ON categories(display_order) WHERE is_active = true;
+```
+
+**Why:** Organize menu items. `display_order` controls menu display sequence.
+
+---
+
+#### **5. menu_items**
+All menu items with pricing.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Item ID |
+| category_id | uuid | FK categories(id) | Category reference |
+| name | varchar(255) | NOT NULL | Item name |
+| description | text | | Item description |
+| price | integer | NOT NULL | Price in paise |
+| image_url | varchar(500) | | Cloudinary URL |
+| is_available | boolean | DEFAULT true | Currently available |
+| is_veg | boolean | DEFAULT true | Vegetarian flag |
+| created_at | timestamp | DEFAULT now() | |
+| updated_at | timestamp | DEFAULT now() | |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_menu_category ON menu_items(category_id);
+CREATE INDEX idx_menu_available ON menu_items(is_available);
+```
+
+**Why:** Store menu with category grouping. Price in paise (no decimals = no rounding errors). `is_available` lets kitchen mark items out of stock.
+
+---
+
+#### **6. orders**
+Core order table for dine-in and delivery.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Order ID |
+| order_number | serial | UNIQUE, NOT NULL | Human-readable (1001, 1002...) |
+| type | varchar(20) | NOT NULL | dine-in, delivery, takeaway |
+| status | varchar(20) | NOT NULL | pending, cooking, ready, served, etc. |
+| table_id | uuid | FK tables(id) | For dine-in only |
+| customer_name | varchar(255) | | For delivery/takeaway |
+| customer_phone | varchar(20) | | For delivery/takeaway |
+| customer_address | text | | For delivery only |
+| subtotal | integer | NOT NULL | Items total (paise) |
+| discount | integer | DEFAULT 0 | Discount amount (paise) |
+| discount_reason | text | | Why discount applied |
+| tax | integer | NOT NULL | GST amount (paise) |
+| total | integer | NOT NULL | Final amount (paise) |
+| payment_method | varchar(20) | | cash, card, upi, online |
+| payment_status | varchar(20) | | pending, paid, failed |
+| notes | text | | Special instructions |
+| version | integer | DEFAULT 1 | Optimistic locking |
+| created_by | uuid | FK users(id), NOT NULL | Waiter who created |
+| created_at | timestamp | DEFAULT now() | Order time |
+| updated_at | timestamp | DEFAULT now() | |
+| completed_at | timestamp | | When status → completed |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_orders_number ON orders(order_number);
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX idx_orders_created_by ON orders(created_by);
+CREATE INDEX idx_orders_table ON orders(table_id) WHERE table_id IS NOT NULL;
+CREATE INDEX idx_orders_type_status ON orders(type, status);
+```
+
+**Why:**
+- `order_number` is human-readable, auto-incrementing.
+- `version` prevents race conditions (optimistic locking).
+- Money fields are integers (paise) as per AGENTS.md.
+- `status` follows state machine (see business-rules.md).
+- `discount_reason` required for audit trail.
+
+**Order Status Flow:**
+```
+pending → cooking → ready → served → completed
+              ↓              ↓
+          cancelled      assigned → out_for_delivery → delivered → completed
+                                        ↓
+                                    cancelled
+```
+
+---
+
+#### **7. order_items**
+Items within each order.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Line item ID |
+| order_id | uuid | FK orders(id) CASCADE | Parent order |
+| menu_item_id | uuid | FK menu_items(id) | Menu item reference |
+| menu_item_name | varchar(255) | NOT NULL | Item name at order time |
+| quantity | integer | NOT NULL | Count ordered |
+| unit_price | integer | NOT NULL | Price per unit (paise) |
+| total_price | integer | NOT NULL | quantity × unit_price (paise) |
+| notes | text | | Special requests (no onions) |
+| created_at | timestamp | DEFAULT now() | |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_items_menu ON order_items(menu_item_id);
+```
+
+**Why:**
+- Store `menu_item_name` and `unit_price` at order time (prices may change later).
+- CASCADE delete: When order deleted, items are too.
+- `total_price` = `quantity * unit_price` (pre-calculated for reporting).
+
+---
+
+#### **8. delivery_assignments**
+Assign riders to delivery orders.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Assignment ID |
+| order_id | uuid | FK orders(id) | Delivery order |
+| delivery_user_id | uuid | FK users(id) | Rider assigned |
+| assigned_by | uuid | FK users(id) | Manager who assigned |
+| assigned_at | timestamp | DEFAULT now() | Assignment time |
+| picked_up_at | timestamp | | When rider picked up |
+| delivered_at | timestamp | | When delivered |
+| is_active | boolean | DEFAULT true | Current assignment |
+| created_at | timestamp | DEFAULT now() | |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_delivery_order ON delivery_assignments(order_id);
+CREATE INDEX idx_delivery_user ON delivery_assignments(delivery_user_id, is_active);
+```
+
+**Why:**
+- One order can have multiple assignments (if re-assigned).
+- `is_active = true` marks current assignment.
+- Track timestamps for delivery time reports.
+
+---
+
+#### **9. cash_handovers**
+Riders hand over collected cash to managers.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Handover ID |
+| delivery_user_id | uuid | FK users(id), NOT NULL | Rider |
+| manager_id | uuid | FK users(id), NOT NULL | Manager receiving |
+| amount | integer | NOT NULL | Total cash (paise) |
+| order_ids | jsonb | NOT NULL | Array of order UUIDs |
+| verified | boolean | DEFAULT false | Manager verified |
+| notes | text | | Discrepancy notes |
+| created_at | timestamp | DEFAULT now() | Handover time |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_cash_handover_user ON cash_handovers(delivery_user_id);
+CREATE INDEX idx_cash_handover_manager ON cash_handovers(manager_id);
+CREATE INDEX idx_cash_handover_date ON cash_handovers(created_at DESC);
+```
+
+**Why:**
+- Record all cash collected by riders.
+- `order_ids` jsonb stores list of order UUIDs.
+- `verified` flag prevents duplicate handovers.
+- Audit trail for cash reconciliation.
+
+---
+
+#### **10. stock_movements**
+Track all inventory changes (never overwrite stock levels).
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Movement ID |
+| menu_item_id | uuid | FK menu_items(id) | Item affected |
+| type | varchar(20) | NOT NULL | purchase, consumption, waste, adjustment |
+| quantity | integer | NOT NULL | +positive / -negative |
+| reason | text | | Why this movement |
+| reference_id | uuid | | order_id if consumption |
+| created_by | uuid | FK users(id) | User who recorded |
+| created_at | timestamp | DEFAULT now() | |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_stock_item ON stock_movements(menu_item_id);
+CREATE INDEX idx_stock_type ON stock_movements(type);
+CREATE INDEX idx_stock_created ON stock_movements(created_at DESC);
+```
+
+**Why:**
+- **Never overwrite stock** - all changes are movements.
+- Current stock = SUM(quantity) for that menu_item_id.
+- Types: `purchase` (+), `consumption` (-), `waste` (-), `adjustment` (±).
+- `reference_id` links to order when type = consumption.
+
+**Stock Calculation:**
+```sql
+SELECT 
+  menu_item_id,
+  SUM(quantity) as current_stock
+FROM stock_movements
+GROUP BY menu_item_id;
+```
+
+---
+
+#### **11. audit_logs**
+Track all money-sensitive and permission-sensitive actions.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | uuid | PRIMARY KEY | Log ID |
+| user_id | uuid | FK users(id) | Who performed action |
+| action | varchar(50) | NOT NULL | discount_applied, order_voided, etc. |
+| resource_type | varchar(50) | | order, user, stock |
+| resource_id | uuid | | ID of affected resource |
+| metadata | jsonb | | Action details |
+| ip_address | varchar(50) | | User's IP |
+| created_at | timestamp | DEFAULT now() | When it happened |
+
+**Indexes:**
+```sql
+CREATE INDEX idx_audit_user ON audit_logs(user_id);
+CREATE INDEX idx_audit_action ON audit_logs(action);
+CREATE INDEX idx_audit_created ON audit_logs(created_at DESC);
+CREATE INDEX idx_audit_resource ON audit_logs(resource_type, resource_id);
+```
+
+**Why:**
+- Log every sensitive action (discounts, voids, refunds, staff changes).
+- `metadata` jsonb stores action-specific details.
+- Required for compliance and dispute resolution.
+- Admin-only access.
+
+**Example metadata:**
+```json
+{
+  "discount_amount": 10000,
+  "discount_reason": "Birthday offer",
+  "original_total": 59000,
+  "new_total": 49000
+}
+```
+
+---
+
+### Relationships Summary
+
+```
+users (1) ─────< (M) orders
+users (1) ─────< (M) sessions
+users (1) ─────< (M) delivery_assignments
+users (1) ─────< (M) cash_handovers (as delivery_user)
+users (1) ─────< (M) cash_handovers (as manager)
+users (1) ─────< (M) stock_movements
+users (1) ─────< (M) audit_logs
+
+tables (1) ─────< (M) orders
+
+categories (1) ─────< (M) menu_items
+
+orders (1) ─────< (M) order_items
+orders (1) ─────< (M) delivery_assignments
+
+menu_items (1) ─────< (M) order_items
+menu_items (1) ─────< (M) stock_movements
+```
+
+**Notation:**
+- (1) = One
+- (M) = Many
+- `─────<` = One-to-Many relationship
+
+---
+
+## Why These Design Decisions?
+
+### 1. **Money as Integer Paise**
+**Problem:** Decimal arithmetic has precision errors.
+```
+0.1 + 0.2 = 0.30000000000000004  ❌
+```
+**Solution:** Store ₹1 as 100 paise (integer).
+```
+100 paise + 200 paise = 300 paise (₹3.00)  ✅
+```
+
+### 2. **order_number vs id**
+- `id` = UUID (unique, not sequential, hard to remember)
+- `order_number` = SERIAL (1001, 1002... human-readable)
+- Use `order_number` for display, `id` for database joins.
+
+### 3. **version Column (Optimistic Locking)**
+**Problem:** Two users update same order simultaneously → data loss.
+**Solution:**
+```sql
+UPDATE orders 
+SET status = 'completed', version = version + 1
+WHERE id = $1 AND version = $2;
+-- If version changed, update fails (conflict detected)
+```
+
+### 4. **Stock as Movements (Not Levels)**
+**Problem:** Overwriting stock loses history.
+```sql
+UPDATE menu_items SET stock = 50;  -- Lost: Why it changed
+```
+**Solution:** Record every change.
+```sql
+INSERT INTO stock_movements VALUES 
+  ('purchase', +100, 'Weekly restock'),
+  ('consumption', -5, 'Order #1001'),
+  ('waste', -3, 'Expired');
+-- Current stock = SUM(quantity) = 92
+```
+
+### 5. **Soft Delete (is_active)**
+Never hard delete users or important data. Mark `is_active = false`.
+**Why:** Preserve audit trail, enable "undo", foreign keys stay valid.
+
+### 6. **JSONB for Flexible Data**
+- `order_ids` in cash_handovers
+- `metadata` in audit_logs
+**Why:** Store arrays/objects without extra tables. Query with PostgreSQL jsonb operators.
+
+### 7. **Timestamps Everywhere**
+Every table has `created_at`, important tables have `updated_at`.
+**Why:** Track when data was created/modified for debugging and reporting.
+
+---
+
+## Migration Strategy
+
+### What Are Migrations?
+
+Migrations are **version-controlled database schema changes**.
+
+**Without migrations:**
+```sql
+-- Developer 1 runs manually
+ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+
+-- Developer 2 doesn't know → different schema → bugs
+```
+
+**With migrations:**
+```typescript
+// migration_001_add_phone_to_users.ts
+export async function up(db) {
+  await db.schema.alterTable('users')
+    .addColumn('phone', 'varchar(20)')
+    .execute();
+}
+
+export async function down(db) {
+  await db.schema.alterTable('users')
+    .dropColumn('phone')
+    .execute();
+}
+```
+
+### Migration Workflow
+
+1. **Generate migration:**
+```bash
+npm run db:generate -- --name add_phone_to_users
+```
+
+2. **Review generated SQL:**
+```sql
+-- migration_001.sql
+ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+```
+
+3. **Apply migration:**
+```bash
+npm run db:migrate
+```
+
+4. **Database tracks applied migrations:**
+```
+migrations_table:
+┌────┬──────────────────────────────┬────────────────────┐
+│ id │ name                         │ applied_at         │
+├────┼──────────────────────────────┼────────────────────┤
+│ 1  │ 001_create_users             │ 2024-11-18 10:00   │
+│ 2  │ 002_create_orders            │ 2024-11-18 10:05   │
+│ 3  │ 003_add_phone_to_users       │ 2024-11-18 11:00   │
+└────┴──────────────────────────────┴────────────────────┘
+```
+
+### Migration Best Practices
+
+✅ **DO:**
+- Create new migration for every schema change
+- Test migration on dev database first
+- Include both `up` (apply) and `down` (rollback)
+- Commit migrations to Git
+
+❌ **DON'T:**
+- Edit applied migrations (create new one instead)
+- Run manual ALTER TABLE on production
+- Skip migrations in development
+
+---
+
+## API Architecture
+
+### Layered Structure
+
+```
+┌─────────────────────────────────────┐
+│          Routes Layer               │  Thin HTTP controllers
+│  - Validate request (Zod)          │  - Check auth/permissions
+│  - Call service                     │  - Return response
+└──────────────┬──────────────────────┘
+               │
+┌──────────────▼──────────────────────┐
+│         Services Layer              │  Business logic
+│  - OrderService                     │  - State machine
+│  - BillingService                   │  - Calculations
+│  - DeliveryService                  │  - Emit Socket events
+└──────────────┬──────────────────────┘
+               │
+┌──────────────▼──────────────────────┐
+│       Data Layer (Drizzle)          │  Database queries
+│  - CRUD operations                  │  - Transactions
+│  - Joins, filters                   │  - Optimistic locking
+└─────────────────────────────────────┘
+```
+
+### Route Example
+
+```typescript
+// apps/server/src/routes/orders.routes.ts
+router.post('/orders', 
+  authenticate,                    // Check JWT
+  authorize(['waiter', 'manager']), // Check role
+  validate(createOrderSchema),     // Validate body
+  async (req, res) => {
+    const order = await OrderService.create(req.body, req.user);
+    res.status(201).json(order);
+  }
+);
+```
+
+### Service Example
+
+```typescript
+// apps/server/src/services/order.service.ts
+class OrderService {
+  async create(data: CreateOrderDto, user: User) {
+    return await db.transaction(async (tx) => {
+      // 1. Validate items exist and are available
+      // 2. Calculate prices from menu (don't trust client)
+      // 3. Apply discount (if authorized)
+      // 4. Calculate tax (18% GST)
+      // 5. Insert order and order_items
+      // 6. Update table status (if dine-in)
+      // 7. Create stock movements (consumption)
+      // 8. Emit Socket.IO event
+      // 9. Return order
+    });
+  }
+}
+```
+
+---
+
+## Real-Time Architecture
 
 ### Socket.IO Rooms
 
 | Room | Members | Events |
 |------|---------|--------|
-| `kitchen` | Kitchen staff | `order:created`, `order:cancelled` |
-| `manager` | Managers, admins | All order events |
-| `delivery:{userId}` | Specific delivery user | `order:assigned`, `order:updated` |
-| `table:{tableId}` | Waiters for that table | `order:updated` for that table |
+| `kitchen` | Kitchen staff | `order:created`, `order:updated` |
+| `manager` | Managers | All events |
+| `delivery:{userId}` | Specific rider | `order:assigned` |
+| `table:{tableId}` | Waiters for table | Table's order updates |
 
 ### Event Flow
 
-```typescript
-// Server emits after database commit
-async function updateOrderStatus(orderId, newStatus) {
-  const order = await db.transaction(async (tx) => {
-    // 1. Update order
-    const updated = await tx.update(orders)
-      .set({ status: newStatus })
-      .where(eq(orders.id, orderId))
-      .returning();
-    return updated[0];
-  });
-  
-  // 2. Emit to relevant rooms (after commit!)
-  io.to('kitchen').emit('order:updated', order);
-  io.to('manager').emit('order:updated', order);
-  if (order.tableId) {
-    io.to(`table:${order.tableId}`).emit('order:updated', order);
-  }
-}
+```
+1. API updates order in database
+2. Database transaction commits
+3. Service emits Socket.IO event
+4. All clients in relevant rooms receive event
+5. Clients invalidate React Query cache
+6. UI auto-updates
 ```
 
-### Client Handling
-
+**Server:**
 ```typescript
-// Client invalidates cache on socket event
-socket.on('order:updated', (order) => {
+// After database commit
+io.to('kitchen').emit('order:created', order);
+io.to(`table:${order.tableId}`).emit('order:updated', order);
+```
+
+**Client:**
+```typescript
+socket.on('order:created', (order) => {
   queryClient.invalidateQueries(['orders']);
-  queryClient.invalidateQueries(['orders', order.id]);
-  
-  // Optional: Optimistic update
-  queryClient.setQueryData(['orders', order.id], order);
+  toast.success(`New order ${order.orderNumber}`);
 });
 ```
 
 ---
 
-## Authentication & Authorization
+## Security Checklist
 
-### Authentication Flow
+✅ **Authentication:**
+- Passwords hashed with argon2id
+- JWT in httpOnly cookies (not localStorage)
+- Session timeout (24 hours)
 
-```
-1. User submits email + password
-2. Server validates credentials
-3. Server generates JWT with { userId, role }
-4. Client stores JWT in httpOnly cookie (secure)
-5. Client includes JWT in Authorization header for all requests
-6. Server validates JWT and extracts user info
-```
+✅ **Authorization:**
+- Every route checks role
+- Data scoped by role (delivery sees only their orders)
+- Permission map enforced server-side
 
-### JWT Structure
+✅ **Input Validation:**
+- All inputs validated with Zod
+- SQL injection: Use Drizzle ORM only
+- XSS: Sanitize user input
 
-```json
-{
-  "userId": "uuid",
-  "email": "user@example.com",
-  "role": "manager",
-  "iat": 1234567890,
-  "exp": 1234567890
-}
-```
+✅ **Money Operations:**
+- All prices recalculated on server
+- Discount requires audit log entry
+- Optimistic locking prevents race conditions
 
-### Authorization Middleware
-
-```typescript
-// apps/server/src/middleware/auth.middleware.ts
-export function authorize(allowedRoles: Role[]) {
-  return (req, res, next) => {
-    const user = req.user; // Set by authenticate middleware
-    
-    if (!allowedRoles.includes(user.role)) {
-      return res.status(403).json({ error: 'Forbidden' });
-    }
-    
-    next();
-  };
-}
-
-// Usage
-router.get('/reports', 
-  authenticate, 
-  authorize(['admin', 'manager']), 
-  getReports
-);
-```
-
-### Permission Checks
-
-Use the permission map from `packages/shared/roles.ts`:
-
-```typescript
-import { hasPermission } from '@repo/shared';
-
-if (!hasPermission(user.role, 'apply_discount')) {
-  throw new ForbiddenError();
-}
-```
+✅ **Secrets:**
+- Environment variables for secrets
+- Never commit .env files
+- Production secrets in hosting platform
 
 ---
 
-## API Design
-
-### REST Conventions
-
-- **GET** - Read data (no side effects)
-- **POST** - Create resources
-- **PATCH** - Partial update
-- **PUT** - Full update (rarely used)
-- **DELETE** - Delete resources
-
-### Endpoint Structure
-
-```
-/api/v1/auth
-  POST   /login
-  POST   /logout
-  GET    /me
-
-/api/v1/orders
-  GET    /           # List orders (filtered by role)
-  POST   /           # Create order
-  GET    /:id        # Get order details
-  PATCH  /:id        # Update order (status, etc.)
-  POST   /:id/cancel # Cancel order
-  
-/api/v1/menu
-  GET    /           # List menu items
-  POST   /           # Create menu item (admin/manager)
-  PATCH  /:id        # Update menu item
-  DELETE /:id        # Delete menu item
-
-/api/v1/delivery
-  GET    /assignments      # Get delivery assignments
-  POST   /assignments      # Assign rider to order
-  POST   /cash-handover    # Record cash handover
-```
-
-### Request/Response Format
-
-**Request:**
-```json
-POST /api/v1/orders
-{
-  "type": "dine-in",
-  "tableId": "uuid",
-  "items": [
-    { "menuItemId": "uuid", "quantity": 2, "notes": "No onions" }
-  ],
-  "notes": "Extra plates"
-}
-```
-
-**Response (Success):**
-```json
-{
-  "id": "uuid",
-  "orderNumber": 42,
-  "type": "dine-in",
-  "status": "pending",
-  "tableId": "uuid",
-  "items": [...],
-  "subtotal": 50000,
-  "tax": 9000,
-  "total": 59000,
-  "createdAt": "2024-11-17T10:30:00Z"
-}
-```
-
-**Response (Error):**
-```json
-{
-  "error": "Validation failed",
-  "details": [
-    { "field": "items", "message": "At least one item required" }
-  ]
-}
-```
-
-### Status Codes
-
-- **200** - Success
-- **201** - Created
-- **400** - Bad request (validation error)
-- **401** - Unauthorized (not logged in)
-- **403** - Forbidden (insufficient permissions)
-- **404** - Not found
-- **409** - Conflict (optimistic locking failure)
-- **500** - Server error
-
----
-
-## State Management
-
-### State Management
-
-Order state machine must be implemented on the server and enforced by the API.
-
-**Allowed transitions are defined in the business rules document.**
-
-```typescript
-export const orderStateMachine = {
-  pending: ['cooking', 'cancelled'],
-  cooking: ['ready', 'cancelled'],
-  ready: ['served', 'assigned'], // served=dine-in, assigned=delivery
-  served: ['completed'],
-  assigned: ['out_for_delivery', 'cancelled'],
-  out_for_delivery: ['delivered'],
-  delivered: ['completed'],
-  completed: ['voided'], // admin only
-  cancelled: [],
-  voided: [],
-};
-
-export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
-  return orderStateMachine[from]?.includes(to) ?? false;
-}
-```
-
-**Backend enforcement:**
-```typescript
-if (!canTransition(order.status, newStatus)) {
-  throw new BadRequestError(
-    `Cannot transition from ${order.status} to ${newStatus}`
-  );
-}
-```
-
----
-
-## File Upload & Storage
-
-### Cloudinary Integration
-
-- **Menu item images** uploaded to Cloudinary
-- **Signed uploads**: Backend generates signed URL, frontend uploads directly
-- **Transformations**: Automatic resizing, format conversion
-
-```typescript
-// Backend: Generate signed upload URL
-router.post('/menu/upload-url', authenticate, authorize(['admin', 'manager']), 
-  async (req, res) => {
-    const timestamp = Math.round(Date.now() / 1000);
-    const signature = cloudinary.utils.api_sign_request(
-      { timestamp, folder: 'menu' },
-      process.env.CLOUDINARY_API_SECRET
-    );
-    
-    res.json({
-      url: `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-      timestamp,
-      signature,
-      cloudName,
-      folder: 'menu',
-    });
-  }
-);
-
-// Frontend: Upload to Cloudinary
-const uploadToCloudinary = async (file: File) => {
-  const { url, timestamp, signature, cloudName, folder } = 
-    await api.get('/menu/upload-url');
-  
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('timestamp', timestamp);
-  formData.append('signature', signature);
-  formData.append('folder', folder);
-  formData.append('api_key', cloudName);
-  
-  const response = await fetch(url, {
-    method: 'POST',
-    body: formData,
-  });
-  
-  const data = await response.json();
-  return data.secure_url;
-};
-```
-
----
-
-## Deployment Architecture
+## Deployment
 
 ### Development
-
 ```
-Local machine:
-├── PostgreSQL (Docker)
-├── Redis (Docker, optional)
-├── apps/server → http://localhost:3001
-├── apps/client → http://localhost:3000
-└── apps/waiter-pwa → http://localhost:5173
+Local:
+- PostgreSQL: Docker (localhost:5432)
+- Server: http://localhost:3001
+- Client: http://localhost:3000
+- PWA: http://localhost:5173
 ```
 
-### Production (Future)
-
+### Production (Recommended)
 ```
-                  ┌─────────────┐
-                  │  Cloudflare │
-                  │     CDN     │
-                  └──────┬──────┘
-                         │
-         ┌───────────────┴───────────────┐
-         │                               │
-   ┌─────▼─────┐                  ┌──────▼──────┐
-   │  Vercel   │                  │   Railway   │
-   │  (Client) │                  │   (Server)  │
-   └───────────┘                  └──────┬──────┘
-                                         │
-                           ┌─────────────┴──────────────┐
-                           │                            │
-                     ┌─────▼──────┐            ┌────────▼────────┐
-                     │    Neon    │            │   Upstash Redis │
-                     │ PostgreSQL │            │    (optional)   │
-                     └────────────┘            └─────────────────┘
-```
-
-**Services:**
-- **Frontend**: Vercel (Next.js, automatic deployments)
-- **PWA**: Vercel or Netlify (static build + service worker)
-- **Backend**: Railway, Render, or Fly.io (Node.js, WebSocket support)
-- **Database**: Neon (serverless PostgreSQL)
-- **Redis**: Upstash (serverless Redis)
-- **Images**: Cloudinary
-- **Monitoring**: Sentry (errors), Vercel Analytics
-
----
-
-## Security Considerations
-
-### Input Validation
-
-- All inputs validated with **Zod schemas**
-- Server-side validation is authoritative
-- Sanitize user input for XSS prevention
-
-### SQL Injection Prevention
-
-- Use **Drizzle ORM** exclusively (parameterized queries)
-- Never build SQL strings from user input
-
-### Authentication Security
-
-- Passwords hashed with **argon2id** (not bcrypt)
-- JWT stored in **httpOnly cookies** (not localStorage)
-- CSRF protection via SameSite cookie attribute
-- Rate limiting on login endpoint (future: Redis)
-
-### Authorization
-
-- Every route checks role and permissions on server
-- Data scoped by role (delivery users see only their orders)
-- Sensitive actions logged to audit_logs
-
-### HTTPS & CORS
-
-- HTTPS enforced in production
-- CORS configured to allow only trusted origins
-- Socket.IO CORS restricted to frontend domains
-
-### Secrets Management
-
-- Environment variables for secrets
-- Never commit `.env` files
-- Production secrets in hosting platform (Vercel env vars, Railway secrets)
-
-### Content Security Policy (Future)
-
-```
-Content-Security-Policy: 
-  default-src 'self'; 
-  script-src 'self' 'unsafe-inline'; 
-  style-src 'self' 'unsafe-inline'; 
-  img-src 'self' https://res.cloudinary.com;
+- Frontend: Vercel (Next.js auto-deploy)
+- Backend: Railway / Render (Node.js + WebSocket)
+- Database: Neon (serverless PostgreSQL)
+- Images: Cloudinary
+- Redis: Upstash (future)
 ```
 
 ---
 
-## Performance & Scalability
+## Next Steps
 
-### Database Optimization
-
-- **Indexes** on frequently queried columns (status, created_at, user_id)
-- **Connection pooling** via Drizzle
-- **Read replicas** for reports (future)
-- **Pagination** for large lists
-
-### Caching Strategy
-
-- **React Query**: Client-side caching (5-minute stale time)
-- **Redis**: Server-side caching for menu, reports (future)
-- **CDN**: Static assets cached at edge (Cloudflare)
-
-### Real-time Optimization
-
-- **Socket.IO rooms**: Users join only relevant rooms
-- **Redis adapter**: Scale Socket.IO across multiple servers (future)
-- **Event debouncing**: Batch rapid updates on client
-
-### Code Splitting
-
-- Next.js automatic code splitting
-- Dynamic imports for heavy components
-- Route-based splitting for admin/manager/kitchen/delivery
-
-### Monitoring
-
-- **Sentry**: Error tracking and performance monitoring
-- **Database query time**: Log slow queries (>100ms)
-- **API response time**: Monitor p95, p99 latencies
+1. **Create database schema** using Drizzle
+2. **Generate initial migrations**
+3. **Implement authentication** (JWT + argon2id)
+4. **Build order service** (state machine)
+5. **Add Socket.IO** for real-time updates
+6. **Implement billing** with discount logic
+7. **Add delivery** assignment and cash handover
+8. **Build reports** with aggregations
+9. **Add audit logging** for sensitive actions
+10. **Deploy to production**
 
 ---
 
-### Development Workflow
-
-### Install Dependencies
-
-```bash
-# Install all apps at once
-npm run install:all
-```
-
-### Local Development
-
-```bash
-# Start all apps
-npm run dev
-
-# Or individual apps
-npm run dev:server
-npm run dev:client
-npm run dev:pwa
-
-# Run tests
-npm run test
-
-# Lint
-npm run lint
-
-# Build
-npm run build
-```
-
-### Database Migrations
-
-```bash
-# Generate migration
-cd apps/server && npm run db:generate
-
-# Apply migration
-cd apps/server && npm run db:migrate
-
-# Seed database (development)
-cd apps/server && npm run db:seed
-```
-
----
-
-## Future Enhancements
-
-### Phase 1 (Current)
-- ✅ Core order flow (dine-in, delivery)
-- ✅ User roles and authentication
-- ✅ Real-time updates
-- ✅ Basic billing
-
-### Phase 2
-- Multiple payment methods (card, UPI via Razorpay)
-- Advanced reporting (sales by day, staff performance)
-- Stock alerts and low-stock notifications
-
-### Phase 3
-- Table reservations
-- Customer loyalty program
-- SMS/WhatsApp notifications (via Twilio)
-
-### Phase 4
-- Multi-location support (franchises)
-- Kitchen display system (KDS) hardware integration
-- Printer integration (kitchen tickets, bills)
-
-### Phase 5
-- Mobile apps (React Native)
-- QR code ordering (customers scan and order)
-- Online ordering (website integration)
-
-### Phase 6
-- Analytics dashboard (trends, predictions)
-- Inventory purchase orders
-- Supplier management
-
-### Phase 7
-- AI assistant (read-only sales and stock questions)
-- Voice ordering
-- Recipe and prep instructions
-
----
-
-## References
-
-- [Business Rules](./business-rules.md) - Business logic and workflows
-- [AGENTS.md](../AGENTS.md) - AI assistant rules for this project
-
----
-
-**Last updated:** 2024-11-17
+**Last Updated:** 2024-11-18
